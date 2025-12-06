@@ -12,3 +12,15 @@ ollama
 pydantic
 pynput
 pyttsx3
+librosa
+transformers
+albumentations
+albucore
+torchdiffeq
+timm
+face_alignment
+flow-vis
+pandas
+tqdm
+matplotlib
+pyyaml

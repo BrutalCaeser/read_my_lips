@@ -1,0 +1,91 @@
+# Chaplin Project: Visual Speech Recognition & Talking Head Generation Pipeline
+
+## 1. Project Overview
+**Chaplin** is a local, real-time Visual Speech Recognition (VSR) tool that has been extended to include a talking head generation capability. The complete pipeline allows a user to:
+1.  **Speak silently** into a webcam (Lip Reading).
+2.  **Transcribe** the visual speech into text using a VSR model.
+3.  **Correct** the raw transcription using a local Large Language Model (LLM).
+4.  **Synthesize** the corrected text into speech (TTS).
+5.  **Generate** a talking head video synchronized with the synthesized audio.
+
+---
+
+## 2. Pipeline Architecture
+
+### Stage 1: Visual Speech Recognition (VSR)
+*   **Input**: Real-time video feed from the user's webcam.
+*   **Process**:
+    *   The user toggles recording with the `Alt`/`Option` key.
+    *   Video frames are captured and passed to the `InferencePipeline` (wrapping an `AVSR` model).
+    *   The model (based on Auto-AVSR/E2E Transformer) predicts raw text from the lip movements.
+*   **Output**: Raw, often imperfect, text transcription (e.g., "HELLO WORLD").
+
+### Stage 2: Text Correction & Speech Synthesis
+*   **Input**: Raw text from Stage 1.
+*   **Process**:
+    *   **Correction**: The raw text is sent to a local Ollama instance running the `qwen3` model. A system prompt instructs the LLM to fix mistranscriptions and add punctuation without altering the meaning.
+    *   **TTS**: The corrected text is converted to audio using `pyttsx3`.
+*   **Output**:
+    *   Corrected text (e.g., "Hello, world.").
+    *   Audio file (`corrected_output_audio.wav`).
+
+### Stage 3: Talking Head Generation (FLOAT Integration)
+*   **Input**:
+    *   A reference image (e.g., `sam_altman.webp`).
+    *   The audio file from Stage 2.
+*   **Process**:
+    *   The system initializes the **FLOAT** (Flow Matching for Audio-driven Talking Portrait) model.
+    *   It uses `Wav2Vec2` for audio feature extraction and emotion recognition.
+    *   A flow-matching transformer generates motion latents based on the audio.
+    *   A style-based decoder renders the final video frames, warping the reference image to match the predicted motion.
+*   **Output**: A video file (`output_video_{sequence}.mp4`) of the reference image speaking the corrected text.
+
+---
+
+## 3. Integration Challenges & Solutions
+
+Integrating the `float` repository into the existing `chaplin` project on a macOS (M4 chip) environment presented several challenges. Below is a log of the errors encountered and their resolutions.
+
+### Error 1: Missing Dependencies
+**Issue**: The `float` module required several libraries not present in the original `chaplin` environment.
+**Error**: `ModuleNotFoundError: No module named 'librosa'` (and others).
+**Solution**:
+*   Updated `requirements.txt` to include: `librosa`, `transformers`, `albumentations`, `albucore`, `torchdiffeq`, `timm`, `face_alignment`, `flow-vis`, `pandas`, `tqdm`, `matplotlib`, `pyyaml`.
+*   Ran `uv` to install these dependencies into the virtual environment.
+
+### Error 2: Argument Parsing Conflict
+**Issue**: The `float` module's `InferenceOptions` class used `argparse` to parse command-line arguments. This conflicted with `hydra`, which `chaplin` uses for its own configuration.
+**Error**: `main.py: error: unrecognized arguments: config_filename=...`
+**Solution**:
+*   Modified `float_module/options/base_options.py` to accept an optional `args` list in the `parse` method.
+*   Updated `chaplin.py` to call `InferenceOptions().parse(args=[])`, forcing it to ignore the global command-line arguments.
+
+### Error 3: CUDA/Device Mismatch on macOS
+**Issue**: The `float` code was hardcoded to expect CUDA or didn't handle the MPS (Metal Performance Shaders) device correctly for `face_alignment`.
+**Error**: `AssertionError: Torch not compiled with CUDA enabled` (in `face_alignment`).
+**Solution**:
+*   Modified `float_module/generate.py` to explicitly pass `device='mps'` (or `'cpu'`) to the `face_alignment.FaceAlignment` constructor based on availability.
+
+### Error 4: Missing MPS Operator (QR Decomposition)
+**Issue**: The `torch.linalg.qr` operator is not yet implemented for the MPS backend in PyTorch.
+**Error**: `NotImplementedError: The operator 'aten::linalg_qr.out' is not currently implemented for the MPS device.`
+**Solution**:
+*   **Fallback**: Added `os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"` in `chaplin.py` to allow PyTorch to fall back to CPU for missing operators.
+*   **Explicit Cast**: Modified `float_module/models/float/styledecoder.py` to explicitly move the tensor to CPU before calling `qr`, then move the result back to the original device.
+
+### Error 5: Attention Implementation Conflict
+**Issue**: Newer `transformers` versions default to `sdpa` (Scaled Dot Product Attention), which does not support `output_attentions=True`, a requirement for the `Wav2VecModel` usage in this project.
+**Error**: `ValueError: The output_attentions attribute is not supported when using the attn_implementation set to sdpa.`
+**Solution**:
+*   Modified `float_module/models/float/FLOAT.py` to load the `Wav2VecModel` with `attn_implementation="eager"`.
+
+### Error 6: Hardcoded CUDA Calls
+**Issue**: The `styledecoder.py` file contained a hardcoded `.cuda()` call for creating a grid tensor.
+**Error**: `AssertionError: Torch not compiled with CUDA enabled`.
+**Solution**:
+*   Replaced `.cuda()` with `.to(input.device)` in `float_module/models/float/styledecoder.py` to ensure compatibility with both MPS and CPU.
+
+---
+
+## 4. Conclusion
+The project now successfully runs a complete end-to-end pipeline on macOS (Apple Silicon). It leverages the power of local LLMs for text correction and state-of-the-art generative models for video synthesis, all within a unified Python environment.

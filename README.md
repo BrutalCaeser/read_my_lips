@@ -37,7 +37,7 @@ Watch a demo of Chaplin [here](https://youtu.be/qlHi0As2alQ).
 
 1. Run the following command:
    ```sh
-   uv run --with-requirements requirements.txt --python 3.12 main.py config_filename=./configs/LRS3_V_WER19.1.ini detector=mediapipe
+   uv run --with-requirements requirements.txt --python 3.10 main.py config_filename=./configs/LRS3_V_WER19.1.ini detector=mediapipe
    ```
 2. Once the camera feed is displayed, you can start "recording" by pressing the `option` key (Mac) or the `alt` key (Windows/Linux), and start mouthing words.
 3. To stop recording, press the `option` key (Mac) or the `alt` key (Windows/Linux) again. The raw VSR output will get logged in your terminal, and the LLM-corrected version will be typed at your cursor.

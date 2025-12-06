@@ -169,6 +169,58 @@ class Chaplin:
         InferencePipeline.text_to_speech(corrected_output, audio_file_path)
         print(f"Audio file generated: {audio_file_path}")
 
+        # Generate talking head video
+        try:
+            import os
+            # Enable MPS fallback for missing operators like linalg_qr
+            os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+            
+            from float_module.generate import InferenceAgent, InferenceOptions
+            
+            print("\n\033[48;5;22m\033[97m\033[1m GENERATING TALKING HEAD VIDEO \033[0m\n")
+            
+            # Setup options
+            # Pass empty list to avoid conflict with hydra arguments
+            opt = InferenceOptions().parse(args=[])
+            opt.ckpt_path = os.path.abspath("float_module/checkpoints/float.pth")
+            opt.wav2vec_model_path = os.path.abspath("float_module/checkpoints/wav2vec2-base-960h")
+            opt.audio2emotion_path = os.path.abspath("float_module/checkpoints/wav2vec-english-speech-emotion-recognition")
+            
+            # Use MPS if available, else CPU
+            import torch
+            if torch.backends.mps.is_available():
+                opt.rank = torch.device("mps")
+            else:
+                opt.rank = torch.device("cpu")
+            
+            # Initialize agent
+            agent = InferenceAgent(opt)
+            
+            # Set paths
+            ref_path = os.path.abspath("float_module/assets/sam_altman.webp") # Default reference image
+            aud_path = os.path.abspath(audio_file_path)
+            res_video_path = os.path.abspath(f"output_video_{sequence_num}.mp4")
+            
+            # Run inference
+            agent.run_inference(
+                res_video_path,
+                ref_path,
+                aud_path,
+                a_cfg_scale=opt.a_cfg_scale,
+                r_cfg_scale=opt.r_cfg_scale,
+                e_cfg_scale=opt.e_cfg_scale,
+                emo=opt.emo,
+                nfe=opt.nfe,
+                no_crop=opt.no_crop,
+                seed=opt.seed
+            )
+            print(f"\n\033[48;5;22m\033[97m\033[1m VIDEO GENERATED: {res_video_path} \033[0m\n")
+            
+        except Exception as e:
+            print(f"Error generating talking head video: {e}")
+            import traceback
+            traceback.print_exc()
+
         # Return corrected output and audio file path for further use
         return {
             "output": output,
