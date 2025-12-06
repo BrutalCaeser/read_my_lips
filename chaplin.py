@@ -73,25 +73,51 @@ class Chaplin:
         self.recording = not self.recording
 
     async def correct_output_async(self, output, sequence_num):
+        # Debugging: Start of correct_output_async
+        print("Debug: Entering correct_output_async...")
+
         # perform inference on the raw output to get back a "correct" version
-        response = await self.ollama_client.chat(
-            model='qwen3:4b',
-            messages=[
-                {
-                    'role': 'system',
-                    'content': f"You are an assistant that helps make corrections to the output of a lipreading model. The text you will receive was transcribed using a video-to-text system that attempts to lipread the subject speaking in the video, so the text will likely be imperfect. The input text will also be in all-caps, although your respose should be capitalized correctly and should NOT be in all-caps.\n\nIf something seems unusual, assume it was mistranscribed. Do your best to infer the words actually spoken, and make changes to the mistranscriptions in your response. Do not add more words or content, just change the ones that seem to be out of place (and, therefore, mistranscribed). Do not change even the wording of sentences, just individual words that look nonsensical in the context of all of the other words in the sentence.\n\nAlso, add correct punctuation to the entire text. ALWAYS end each sentence with the appropriate sentence ending: '.', '?', or '!'. \n\nReturn the corrected text in the format of 'list_of_changes' and 'corrected_text'."
-                },
-                {
-                    'role': 'user',
-                    'content': f"Transcription:\n\n{output}"
-                }
-            ],
-            format=ChaplinOutput.model_json_schema()
-        )
+        # Debugging: Before calling Ollama client
+        print("Debug: About to call Ollama client with timeout...")
+
+        try:
+            # Changing the model to a different one for testing
+            response = await asyncio.wait_for(
+                self.ollama_client.chat(
+                    model='qwen3:0.6b',  # Replace with the desired model name
+                    messages=[
+                        {
+                            'role': 'system',
+                            'content': f"You are an assistant that helps make corrections to the output of a lipreading model. The text you will receive was transcribed using a video-to-text system that attempts to lipread the subject speaking in the video, so the text will likely be imperfect. The input text will also be in upper case. Your response should NOT be in upper case but seem like normal english sentence.\n\nIf something seems unusual, assume it was mistranscribed. Do your best to infer the words actually spoken, and make changes to the mistranscriptions in your response. Do not add more words or content, just change the ones that seem to be out of place (and, therefore, mistranscribed). Do not change even the wording of sentences, just individual words that look nonsensical in the context of all of the other words in the sentence.\n\nAlso, add correct punctuation to the entire text. ALWAYS end each sentence with the appropriate sentence ending: '.', '?', or '!'. \n\nReturn the corrected text in the format of 'list_of_changes' and 'corrected_text'."
+                        },
+                        {
+                            'role': 'user',
+                            'content': f"Transcription:\n\n{output}"
+                        }
+                    ],
+                    format=ChaplinOutput.model_json_schema()
+                ),
+                timeout=60  # Timeout set to 60 seconds
+            )
+
+            # Debugging: Response received
+            print("Debug: Response successfully received from Ollama client.")
+        except asyncio.TimeoutError:
+            # Debugging: Timeout occurred
+            print("Debug: Timeout occurred while waiting for Ollama client response.")
+            return "Timeout occurred while processing the request."
+        except Exception as e:
+            # Debugging: Exception occurred
+            print(f"Debug: Exception occurred while calling Ollama client: {e}")
+            raise
 
         # get only the corrected text
         chat_output = ChaplinOutput.model_validate_json(
-            response['message']['content'])
+            response['message']['content']
+        )
+
+        # Debugging: Corrected text extracted
+        print(f"Debug: Corrected text extracted: {chat_output.corrected_text}")
 
         # if last character isn't a sentence ending (happens sometimes), add a period
         chat_output.corrected_text = chat_output.corrected_text.strip()
@@ -126,15 +152,28 @@ class Chaplin:
         sequence_num = self.current_sequence
         self.current_sequence += 1
 
-        # start the async LLM correction (non-blocking) with sequence number
-        asyncio.run_coroutine_threadsafe(
+        # Debugging: Ensure corrected output is being processed
+        print("Debug: Starting LLM correction...")
+        corrected_output = asyncio.run_coroutine_threadsafe(
             self.correct_output_async(output, sequence_num),
             self.loop
-        )
+        ).result()
+        print("Debug: LLM correction completed.")
 
-        # return immediately without waiting for correction
+        # Ensure corrected text is logged explicitly
+        print(f"\n\033[48;5;22m\033[97m\033[1m CORRECTED OUTPUT \033[0m: {corrected_output}\n")
+
+        # Convert corrected text to audio
+        audio_file_path = "corrected_output_audio.wav"
+        from pipelines.pipeline import InferencePipeline
+        InferencePipeline.text_to_speech(corrected_output, audio_file_path)
+        print(f"Audio file generated: {audio_file_path}")
+
+        # Return corrected output and audio file path for further use
         return {
             "output": output,
+            "corrected_output": corrected_output,
+            "audio_file_path": audio_file_path,
             "video_path": video_path
         }
 
@@ -250,3 +289,37 @@ class Chaplin:
 
         # shutdown executor
         self.executor.shutdown(wait=True)
+
+
+# Ensure the test function is accessible at the module level
+def test_ollama_client():
+    """Test the Ollama client with a simple input to verify functionality."""
+    import asyncio
+
+    async def test():
+        client = AsyncClient()
+        try:
+            print("Testing Ollama client...")
+            response = await asyncio.wait_for(
+                client.chat(
+                    model='qwen3:4b',
+                    messages=[
+                        {
+                            'role': 'system',
+                            'content': "You are a test assistant."
+                        },
+                        {
+                            'role': 'user',
+                            'content': "Hello, can you respond to this simple test?"
+                        }
+                    ]
+                ),
+                timeout=30
+            )
+            print("Test response received:", response)
+        except asyncio.TimeoutError:
+            print("Test failed: Timeout occurred.")
+        except Exception as e:
+            print(f"Test failed: Exception occurred: {e}")
+
+    asyncio.run(test())

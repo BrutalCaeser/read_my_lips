@@ -4,13 +4,19 @@
 # Copyright 2023 Imperial College London (Pingchuan Ma)
 # Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
 
+import sys
 import os
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import pickle
 from configparser import ConfigParser
 
 from pipelines.model import AVSR
 from pipelines.data.data_module import AVSRDataLoader
+import pyttsx3
 
 
 class InferencePipeline(torch.nn.Module):
@@ -71,3 +77,31 @@ class InferencePipeline(torch.nn.Module):
         data = self.dataloader.load_data(data_filename, landmarks)
         transcript = self.model.infer(data)
         return transcript
+
+    def text_to_speech(corrected_text, output_audio_path):
+        """
+        Converts corrected text into a .wav audio file.
+
+        Args:
+            corrected_text (str): The corrected text to convert to speech.
+            output_audio_path (str): Path to save the generated .wav file.
+        """
+        engine = pyttsx3.init()
+        engine.setProperty('rate', 150)  # Set speaking rate
+        engine.setProperty('volume', 1.0)  # Set volume level
+
+        # Save the audio to a file
+        engine.save_to_file(corrected_text, output_audio_path)
+        engine.runAndWait()
+
+        print(f"Audio file saved at: {output_audio_path}")
+        return output_audio_path
+
+
+if __name__ == "__main__":
+    # Test the text_to_speech function
+    corrected_text = "Hello, this is a test of the text-to-speech functionality."
+    output_audio_path = "test_audio.wav"
+
+    # Call the function to generate the audio file
+    InferencePipeline.text_to_speech(corrected_text, output_audio_path)
