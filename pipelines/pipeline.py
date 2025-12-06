@@ -78,24 +78,60 @@ class InferencePipeline(torch.nn.Module):
         transcript = self.model.infer(data)
         return transcript
 
+    @staticmethod
     def text_to_speech(corrected_text, output_audio_path):
         """
-        Converts corrected text into a .wav audio file.
+        Converts corrected text into a .wav audio file using Microsoft SpeechT5.
 
         Args:
             corrected_text (str): The corrected text to convert to speech.
             output_audio_path (str): Path to save the generated .wav file.
         """
-        engine = pyttsx3.init()
-        engine.setProperty('rate', 150)  # Set speaking rate
-        engine.setProperty('volume', 1.0)  # Set volume level
+        try:
+            from transformers import pipeline
+            from datasets import load_dataset
+            import soundfile as sf
+            import torch
+            import os
 
-        # Save the audio to a file
-        engine.save_to_file(corrected_text, output_audio_path)
-        engine.runAndWait()
-
-        print(f"Audio file saved at: {output_audio_path}")
-        return output_audio_path
+            print("Initializing SpeechT5 TTS...")
+            
+            # Determine device
+            device = "cpu"
+            if torch.cuda.is_available():
+                device = "cuda"
+            elif torch.backends.mps.is_available():
+                device = "mps"
+                
+            # Initialize the pipeline
+            synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
+            
+            # Load xvector containing speaker's voice characteristics from a dataset
+            embeddings_dataset = load_dataset("Matthijs/cmu-arctic-xvectors", split="validation")
+            speaker_embedding = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
+            
+            # Generate speech
+            speech = synthesiser(corrected_text, forward_params={"speaker_embeddings": speaker_embedding})
+            
+            # Save to file
+            sf.write(output_audio_path, speech["audio"], samplerate=speech["sampling_rate"])
+            
+            print(f"Audio file saved at: {output_audio_path}")
+            return output_audio_path
+            
+        except Exception as e:
+            print(f"Error using SpeechT5 TTS: {e}")
+            print("Falling back to pyttsx3...")
+            
+            # Fallback to pyttsx3
+            engine = pyttsx3.init()
+            engine.setProperty('rate', 150)
+            engine.setProperty('volume', 1.0)
+            engine.save_to_file(corrected_text, output_audio_path)
+            engine.runAndWait()
+            
+            print(f"Audio file saved at: {output_audio_path} (via fallback)")
+            return output_audio_path
 
 
 if __name__ == "__main__":

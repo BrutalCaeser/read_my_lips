@@ -24,3 +24,6 @@ pandas
 tqdm
 matplotlib
 pyyaml
+datasets
+soundfile
+sentencepiece
