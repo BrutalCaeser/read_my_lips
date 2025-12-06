@@ -107,7 +107,8 @@ class InferencePipeline(torch.nn.Module):
             synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
             
             # Load xvector containing speaker's voice characteristics from a dataset
-            embeddings_dataset = load_dataset("Matthijs/cmu-arctic-xvectors", split="validation")
+            # trust_remote_code=True is required because this dataset uses a loading script
+            embeddings_dataset = load_dataset("Matthijs/cmu-arctic-xvectors", split="validation", trust_remote_code=True)
             speaker_embedding = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
             
             # Generate speech

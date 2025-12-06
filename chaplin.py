@@ -216,6 +216,21 @@ class Chaplin:
             )
             print(f"\n\033[48;5;22m\033[97m\033[1m VIDEO GENERATED: {res_video_path} \033[0m\n")
             
+            # Auto-play the generated video
+            try:
+                import subprocess
+                import platform
+                
+                print("Auto-playing generated video...")
+                if platform.system() == 'Darwin':       # macOS
+                    subprocess.call(('open', res_video_path))
+                elif platform.system() == 'Windows':    # Windows
+                    os.startfile(res_video_path)
+                else:                                   # linux variants
+                    subprocess.call(('xdg-open', res_video_path))
+            except Exception as e:
+                print(f"Could not auto-play video: {e}")
+
         except Exception as e:
             print(f"Error generating talking head video: {e}")
             import traceback
