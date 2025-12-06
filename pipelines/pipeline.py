@@ -78,6 +78,9 @@ class InferencePipeline(torch.nn.Module):
         transcript = self.model.infer(data)
         return transcript
 
+    _tts_synthesiser = None
+    _tts_speaker_embedding = None
+
     @staticmethod
     def text_to_speech(corrected_text, output_audio_path):
         """
@@ -94,25 +97,30 @@ class InferencePipeline(torch.nn.Module):
             import torch
             import os
 
-            print("Initializing SpeechT5 TTS...")
-            
-            # Determine device
-            device = "cpu"
-            if torch.cuda.is_available():
-                device = "cuda"
-            elif torch.backends.mps.is_available():
-                device = "mps"
+            if InferencePipeline._tts_synthesiser is None:
+                print("Initializing SpeechT5 TTS (First run)...")
                 
-            # Initialize the pipeline
-            synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
-            
-            # Load xvector containing speaker's voice characteristics from a dataset
-            # trust_remote_code=True is required because this dataset uses a loading script
-            embeddings_dataset = load_dataset("Matthijs/cmu-arctic-xvectors", split="validation", trust_remote_code=True)
-            speaker_embedding = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
+                # Determine device
+                device = "cpu"
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif torch.backends.mps.is_available():
+                    device = "mps"
+                    
+                # Initialize the pipeline
+                InferencePipeline._tts_synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
+                
+                # Load xvector containing speaker's voice characteristics from a dataset
+                # Load from parquet to avoid "trust_remote_code" error with newer datasets library
+                embeddings_dataset = load_dataset("parquet", data_files={"validation": "https://huggingface.co/datasets/Matthijs/cmu-arctic-xvectors/resolve/refs%2Fconvert%2Fparquet/default/validation/0000.parquet"}, split="validation")
+                
+                # Index 0 is 'awb' (Male speaker), Index 7306 is 'slt' (Female speaker)
+                InferencePipeline._tts_speaker_embedding = torch.tensor(embeddings_dataset[0]["xvector"]).unsqueeze(0)
+            else:
+                print("Using cached SpeechT5 TTS model...")
             
             # Generate speech
-            speech = synthesiser(corrected_text, forward_params={"speaker_embeddings": speaker_embedding})
+            speech = InferencePipeline._tts_synthesiser(corrected_text, forward_params={"speaker_embeddings": InferencePipeline._tts_speaker_embedding})
             
             # Save to file
             sf.write(output_audio_path, speech["audio"], samplerate=speech["sampling_rate"])

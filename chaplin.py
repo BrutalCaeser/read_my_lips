@@ -197,7 +197,7 @@ class Chaplin:
             agent = InferenceAgent(opt)
             
             # Set paths
-            ref_path = os.path.abspath("float_module/assets/sam_altman.webp") # Default reference image
+            ref_path = os.path.abspath("float_module/prof_nadim.png") # Default reference image
             aud_path = os.path.abspath(audio_file_path)
             res_video_path = os.path.abspath(f"output_video_{sequence_num}.mp4")
             
