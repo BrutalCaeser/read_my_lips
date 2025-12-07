@@ -1,7 +1,5 @@
 # Chaplin: The Silent-to-Voice Avatar Interface
 
-![Chaplin Thumbnail](./thumbnail.png)
-
 **Chaplin** is an end-to-end assistive communication tool designed to empower mute individuals or those who prefer silent communication. It reads your lips in real-time, understands what you are saying, and projects it through a lifelike talking avatar with a synthesized voice.
 
 The entire pipeline runs **fully locally** on your machine, ensuring privacy and low latency.

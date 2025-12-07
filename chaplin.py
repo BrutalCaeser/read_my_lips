@@ -88,7 +88,17 @@ class Chaplin:
                     messages=[
                         {
                             'role': 'system',
-                            'content': f"You are an assistant that helps make corrections to the output of a lipreading model. The text you will receive was transcribed using a video-to-text system that attempts to lipread the subject speaking in the video, so the text will likely be imperfect. The input text will also be in upper case. Your response should NOT be in upper case but seem like normal english sentence.\n\nIf something seems unusual, assume it was mistranscribed. Do your best to infer the words actually spoken, and make changes to the mistranscriptions in your response. Do not add more words or content, just change the ones that seem to be out of place (and, therefore, mistranscribed). Do not change even the wording of sentences, just individual words that look nonsensical in the context of all of the other words in the sentence.\n\nAlso, add correct punctuation to the entire text. ALWAYS end each sentence with the appropriate sentence ending: '.', '?', or '!'. \n\nReturn the corrected text in the format of 'list_of_changes' and 'corrected_text'."
+                            'content': (
+                                "You are a precise text correction assistant. Your ONLY job is to fix transcription errors in lip-read text.\n"
+                                "The input is raw, uppercase text from a lip-reading model. It may have wrong words that look similar on lips (e.g. 'ME' instead of 'BE').\n\n"
+                                "RULES:\n"
+                                "1. Fix nonsensical words based on context. Example: 'THANKS TO ME' -> 'THANKS TO BE' or just 'THANKS'.\n"
+                                "2. Output normal English sentence case (e.g. 'Hello world', not 'Hello World').\n"
+                                "3. Add proper punctuation at the end.\n"
+                                "4. DO NOT add extra words. DO NOT repeat words.\n"
+                                "5. If the sentence is mostly correct, just fix the case and punctuation.\n\n"
+                                "Return JSON with 'list_of_changes' and 'corrected_text'."
+                            )
                         },
                         {
                             'role': 'user',
