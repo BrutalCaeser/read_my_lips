@@ -57,10 +57,31 @@ class AVSR(torch.nn.Module):
             else:
                 enc_feats = self.model.encode(data.to(self.device))
             nbest_hyps = self.beam_search(enc_feats)
+            
+            # Get the best hypothesis
+            best_hyp = nbest_hyps[0]
+            
+            # Calculate confidence using n-best posterior
+            # We compute the softmax of the scores of the n-best hypotheses
+            # This represents the probability of the best hypothesis relative to the other candidates found
+            # Ensure scores are floats (they might be Tensors)
+            scores = [float(h.score) for h in nbest_hyps]
+            
+            if len(scores) > 0:
+                # Numerical stability for softmax: exp(x - max(x)) / sum(exp(x - max(x)))
+                max_score = max(scores)
+                exp_scores = np.exp(np.array(scores) - max_score)
+                probs = exp_scores / exp_scores.sum()
+                confidence = probs[0] # Probability of the top hypothesis
+            else:
+                confidence = 0.0
+                
             nbest_hyps = [h.asdict() for h in nbest_hyps[: min(len(nbest_hyps), 1)]]
             transcription = add_results_to_json(nbest_hyps, self.token_list)
-            transcription = transcription.replace("▁", " ").strip()
-        return transcription.replace("<eos>", "")
+            transcription = transcription.replace(" ", " ").strip()
+            transcription = transcription.replace("<eos>", "")
+            
+        return transcription, confidence
 
 
 def get_beam_search_decoder(model, token_list, rnnlm=None, rnnlm_conf=None, penalty=0, ctc_weight=0.1, lm_weight=0., beam_size=40):

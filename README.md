@@ -6,6 +6,15 @@ The entire pipeline runs **fully locally** on your machine, ensuring privacy and
 
 ---
 
+## ✨ Key Features
+
+*   **Privacy-First Design**: All processing (VSR, LLM, TTS) happens on-device. No data leaves your machine.
+*   **Human-in-the-Loop Verification**: Adaptive confidence scoring prompts you to verify or edit uncertain predictions before they are spoken.
+*   **High-Quality Neural TTS**: Uses Microsoft SpeechT5 for natural-sounding speech (defaulting to a male voice).
+*   **Audit Logging**: Keeps a local record of all interactions for transparency.
+
+---
+
 ## 🚀 The 3-Stage Pipeline
 
 Chaplin transforms silent lip movements into a full audio-visual experience through three distinct stages:
@@ -13,15 +22,18 @@ Chaplin transforms silent lip movements into a full audio-visual experience thro
 ```mermaid
 graph LR
     A[User Mouths Words] -->|Video Feed| B(Stage 1: VSR);
-    B -->|Raw Text| C(Stage 2: Correction & TTS);
-    C -->|Audio & Text| D(Stage 3: Talking Head);
-    D -->|Final Video| E[Avatar Speaks];
+    B -->|Raw Text + Confidence| C{Verification};
+    C -->|High Conf| D(Stage 2: Correction & TTS);
+    C -->|Low Conf| E[User Edit/Accept];
+    E --> D;
+    D -->|Audio & Text| F(Stage 3: Talking Head);
+    F -->|Final Video| G[Avatar Speaks];
 ```
 
 ### 1. Visual Speech Recognition (VSR)
 *   **What it does**: Captures video from your webcam and uses a deep learning model to "read" your lips.
 *   **Technology**: Based on [Auto-AVSR](https://github.com/mpc001/auto_avsr) and trained on the LRS3 dataset.
-*   **Output**: A raw, often imperfect, text transcription (e.g., "HELLO WORLD HOW ARE U").
+*   **Output**: A raw text transcription and a **confidence score**.
 
 ### 2. LLM Correction & Speech Synthesis
 *   **What it does**: 

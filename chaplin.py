@@ -47,6 +47,11 @@ class Chaplin:
         self.typing_lock = None  # will be created in async loop
         self._init_async_resources()
 
+        # Human-in-the-loop settings
+        self.confidence_threshold = 0.45  # High threshold for n-best posterior confidence
+        self.audit_log = []
+        self.audit_log_file = "audit_log.json"
+
         # setup global hotkey for toggling recording with option/alt key
         self.hotkey = keyboard.GlobalHotKeys({
             '<alt>': self.toggle_recording
@@ -154,10 +159,62 @@ class Chaplin:
 
     def perform_inference(self, video_path):
         # perform inference on the video with the vsr model
-        output = self.vsr_model(video_path)
+        output, confidence = self.vsr_model(video_path)
 
         # print the raw output to console
-        print(f"\n\033[48;5;21m\033[97m\033[1m RAW OUTPUT \033[0m: {output}\n")
+        print(f"\n\033[48;5;21m\033[97m\033[1m RAW OUTPUT \033[0m: {output} (Confidence: {confidence:.4f})\n")
+
+        # Human-in-the-loop Verification
+        if confidence < self.confidence_threshold:
+            print(f"\n\033[93m[LOW CONFIDENCE] Score: {confidence:.4f} < Threshold: {self.confidence_threshold}\033[0m")
+            print(f"Predicted Text: {output}")
+            
+            # Play a sound or visual cue could be added here
+            
+            while True:
+                try:
+                    choice = input("Action [ (a)ccept / (e)dit / (d)iscard ]: ").lower().strip()
+                except EOFError:
+                    choice = 'd' # Handle case where input fails
+
+                if choice == 'a' or choice == '':
+                    break
+                elif choice == 'e':
+                    try:
+                        new_output = input(f"Enter corrected text (current: {output}): ").strip().upper()
+                        if new_output:
+                            output = new_output
+                    except EOFError:
+                        pass
+                    print(f"New Text: {output}")
+                    break
+                elif choice == 'd':
+                    print("Discarding output.")
+                    return {"video_path": video_path}
+                else:
+                    print("Invalid choice. Please enter 'a', 'e', or 'd'.")
+        else:
+             print(f"\n\033[92m[HIGH CONFIDENCE] Score: {confidence:.4f} >= Threshold: {self.confidence_threshold}. Auto-accepting.\033[0m")
+
+        # Audit Logging
+        import json
+        import datetime
+        
+        log_entry = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "video_path": video_path,
+            "raw_output": output,
+            "confidence": float(confidence),
+            "threshold": self.confidence_threshold,
+            "action": "processed"
+        }
+        
+        self.audit_log.append(log_entry)
+        try:
+            with open(self.audit_log_file, 'w') as f:
+                json.dump(self.audit_log, f, indent=2)
+        except Exception as e:
+            print(f"Failed to save audit log: {e}")
 
         # assign sequence number for this task
         sequence_num = self.current_sequence

@@ -1,0 +1,10 @@
+[
+  {
+    "timestamp": "2025-12-07T20:20:58.890479",
+    "video_path": "webcam1765167639049.mp4",
+    "raw_output": "\u2581HELLO\u2581MY\u2581NAME\u2581IS\u2581COTTON\u2581I\u2581WENT\u2581TO\u2581SAN\u2581FRANCISCO\u2581TODAY\u2581IT\u2581WAS\u2581GOOD\u2581THANK\u2581YOU",
+    "confidence": 0.7715294432109142,
+    "threshold": 0.45,
+    "action": "processed"
+  }
+]

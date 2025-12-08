@@ -18,16 +18,32 @@
     *   The user toggles recording with the `Alt`/`Option` key.
     *   Video frames are captured and passed to the `InferencePipeline` (wrapping an `AVSR` model).
     *   The model (based on Auto-AVSR/E2E Transformer) predicts raw text from the lip movements.
-*   **Output**: Raw, often imperfect, text transcription (e.g., "HELLO WORLD").
+    *   **Confidence Scoring**: The model calculates a relative posterior probability score (0.0-1.0) based on the softmax of the top beam search hypotheses.
+*   **Output**: 
+    *   Raw text transcription (e.g., "HELLO WORLD").
+    *   Confidence score (e.g., 0.85).
+
+### Stage 1.5: Human-in-the-Loop Verification
+*   **Input**: Raw text and Confidence score from Stage 1.
+*   **Process**:
+    *   The system checks the confidence against a threshold (default `0.8`).
+    *   **High Confidence**: Automatically proceeds to Stage 2.
+    *   **Low Confidence**: Pauses and prompts the user via the terminal to:
+        *   **(a)ccept**: Use the text as is.
+        *   **(e)dit**: Manually correct the text.
+        *   **(d)iscard**: Ignore the input.
+*   **Output**: Verified text ready for correction.
 
 ### Stage 2: Text Correction & Speech Synthesis
-*   **Input**: Raw text from Stage 1.
+*   **Input**: Verified text from Stage 1.5.
 *   **Process**:
-    *   **Correction**: The raw text is sent to a local Ollama instance running the `qwen3` model. A system prompt instructs the LLM to fix mistranscriptions and add punctuation without altering the meaning.
-    *   **TTS**: The corrected text is converted to audio using `pyttsx3`.
+    *   **Correction**: The text is sent to a local Ollama instance running the `qwen3` model. A refined system prompt instructs the LLM to fix mistranscriptions (handling homophenes) and add punctuation without altering the meaning.
+    *   **TTS**: The corrected text is converted to speech using **Microsoft SpeechT5**.
+        *   Uses a specific male speaker embedding (`cmu_us_awb_arctic`).
+        *   Models are cached in memory for low-latency generation.
 *   **Output**:
     *   Corrected text (e.g., "Hello, world.").
-    *   Audio file (`corrected_output_audio.wav`).
+    *   High-quality audio file (`corrected_output_audio.wav`).
 
 ### Stage 3: Talking Head Generation (FLOAT Integration)
 *   **Input**:
@@ -42,7 +58,21 @@
 
 ---
 
-## 3. Integration Challenges & Solutions
+## 3. Privacy & Auditing
+
+To ensure safety and transparency, Chaplin includes a robust auditing system:
+
+*   **Local Processing**: All VSR, LLM, and TTS inference happens locally on the device. No audio or video data is sent to the cloud.
+*   **Audit Log**: A JSON file (`audit_log.json`) records every interaction, including:
+    *   Timestamp
+    *   Raw VSR output
+    *   Confidence score
+    *   Threshold used
+    *   Action taken (processed/discarded)
+
+---
+
+## 4. Integration Challenges & Solutions
 
 Integrating the `float` repository into the existing `chaplin` project on a macOS (M4 chip) environment presented several challenges. Below is a log of the errors encountered and their resolutions.
 
@@ -85,7 +115,13 @@ Integrating the `float` repository into the existing `chaplin` project on a macO
 **Solution**:
 *   Replaced `.cuda()` with `.to(input.device)` in `float_module/models/float/styledecoder.py` to ensure compatibility with both MPS and CPU.
 
+### Error 7: SpeechT5 Dataset Security Restriction
+**Issue**: The `datasets` library blocked the execution of the custom loading script for `Matthijs/cmu-arctic-xvectors` due to security policies (`trust_remote_code=True` is deprecated/unsafe).
+**Error**: `ValueError: trust_remote_code is not supported anymore.`
+**Solution**:
+*   Modified `pipelines/pipeline.py` to load the pre-converted **Parquet** version of the dataset directly from the Hugging Face Hub, bypassing the need for a local execution script.
+
 ---
 
-## 4. Conclusion
+## 5. Conclusion
 The project now successfully runs a complete end-to-end pipeline on macOS (Apple Silicon). It leverages the power of local LLMs for text correction and state-of-the-art generative models for video synthesis, all within a unified Python environment.

@@ -75,8 +75,8 @@ class InferencePipeline(torch.nn.Module):
         assert os.path.isfile(data_filename), f"data_filename: {data_filename} does not exist."
         landmarks = self.process_landmarks(data_filename, landmarks_filename)
         data = self.dataloader.load_data(data_filename, landmarks)
-        transcript = self.model.infer(data)
-        return transcript
+        transcript, confidence = self.model.infer(data)
+        return transcript, confidence
 
     _tts_synthesiser = None
     _tts_speaker_embedding = None
