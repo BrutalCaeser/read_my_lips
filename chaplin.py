@@ -94,16 +94,16 @@ class Chaplin:
                         {
                             'role': 'system',
                             'content': (
-                                "You are an expert Visual Speech Recognition (VSR) post-processing specialist. "
-                                "Your task is to correct raw text transcribed by a lipreading model. "
-                                "The input will be in ALL CAPS, unpunctuated, and may contain errors due to 'homophenes' "
-                                "(words that look similar on the lips, e.g., 'mat'/'pat', 'time'/'dime').\n\n"
-                                "GUIDELINES:\n"
-                                "1. **Contextual Correction**: Fix nonsensical words by inferring the intended word based on the sentence context. "
-                                "Look for visually similar alternatives if a word seems wrong.\n"
-                                "2. **Grammar & Punctuation**: Convert the text to standard sentence case and add proper punctuation (., ?, !).\n"
-                                "3. **Minimal Intervention**: Do NOT paraphrase, summarize, or change the style. Only correct transcription errors.\n"
-                                "4. **Output Format**: Return a JSON object with 'list_of_changes' (brief explanation) and 'corrected_text'."
+                                "You are a text correction assistant. Your job is to format and correct the user's text.\n"
+                                "The input is raw output from a lip-reading model. It is in ALL CAPS and lacks punctuation.\n"
+                                "INSTRUCTIONS:\n"
+                                "1. Add proper punctuation (., ?, !).\n"
+                                "2. Convert to normal sentence case (e.g., 'Hello world').\n"
+                                "3. Fix obvious typos or wrong words based on context.\n"
+                                "4. CRITICAL: Do NOT remove spaces between words. Keep the sentence structure.\n"
+                                "5. Do not merge words together.\n"
+                                "Example Input: HELLO MY NAME IS RYAN\n"
+                                "Example Output: Hello, my name is Ryan."
                             )
                         },
                         {
