@@ -9,9 +9,14 @@ def main(cfg):
     chaplin = Chaplin()
 
     # load the model
+    if torch.cuda.is_available() and cfg.gpu_idx >= 0:
+        device = torch.device(f"cuda:{cfg.gpu_idx}")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     chaplin.vsr_model = InferencePipeline(
-        cfg.config_filename, device=torch.device(f"cuda:{cfg.gpu_idx}" if torch.cuda.is_available(
-        ) and cfg.gpu_idx >= 0 else "cpu"), detector=cfg.detector, face_track=True)
+        cfg.config_filename, device=device, detector=cfg.detector, face_track=True)
 
     print("\n\033[48;5;22m\033[97m\033[1m MODEL LOADED SUCCESSFULLY! \033[0m\n")
 

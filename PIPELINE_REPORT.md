@@ -123,5 +123,41 @@ Integrating the `float` repository into the existing `chaplin` project on a macO
 
 ---
 
+### Error 8: `config_filename` null in Hydra config (post-SSD transfer)
+**Issue**: After transferring the project to an external SSD, `hydra_configs/default.yaml` had `config_filename: null`, so `cfg.config_filename` was `None` at runtime.
+**Error**: `TypeError: stat: path should be string, bytes, os.PathLike or integer, not NoneType`
+**Solution**:
+*   Set `config_filename: configs/LRS3_V_WER19.1.ini` as the default in `hydra_configs/default.yaml`.
+
+### Error 9: Missing model weight files (post-SSD transfer)
+**Issue**: The `.pth` weight files for the VSR model and language model were absent on the new disk. Only the `.json` config files had been committed to the repository.
+**Error**: `FileNotFoundError: benchmarks/LRS3/models/LRS3_V_WER19.1/model.pth`
+**Solution**:
+*   Re-downloaded both files via the existing `setup.sh` script from HuggingFace (`Amanvir/LRS3_V_WER19.1` — 955 MB, `Amanvir/lm_en_subword` — 205 MB).
+
+### Error 10: `ibug` packages missing (post-SSD transfer)
+**Issue**: `ibug-face-detection` and `ibug-face-alignment` were installed as editable packages pointing to a path that no longer existed after the disk transfer. They are not available on PyPI.
+**Error**: `ModuleNotFoundError: No module named 'ibug'`
+**Solution**:
+*   Cloned `github.com/hhj1897/face_detection` and `github.com/hhj1897/face_alignment`.
+*   Installed both with `pip install -e .`.
+*   The ibug LFS budget was exceeded for `Resnet50_Final.pth` (110 MB); the file was obtained separately and placed at `/tmp/face_detection/ibug/face_detection/retina_face/weights/Resnet50_Final.pth`.
+
+### Error 11: RetinaFace detector hardcoded to `cuda:0`
+**Issue**: `pipelines/pipeline.py` passed `device="cuda:0"` directly to `LandmarksDetector`, ignoring the device resolved at startup.
+**Error**: `AssertionError: Torch not compiled with CUDA enabled`
+**Solution**:
+*   Changed line 58 of `pipelines/pipeline.py` from `LandmarksDetector(device="cuda:0")` to `LandmarksDetector(device=str(device))`.
+*   Updated `main.py` to include MPS in the device selection chain: CUDA → MPS → CPU.
+
+### Error 12: CTC prefix scorer device mismatch on MPS
+**Issue**: `espnet/nets/ctc_prefix_score.py` determined `self.device` using `x.is_cuda`, which returns `False` for MPS tensors, silently setting `self.device = cpu`. All internally created tensors (`idx_b`, `idx_bo`, `end_frames`, etc.) were placed on CPU while inputs were on `mps`.
+**Error**: `RuntimeError: Expected all tensors to be on the same device, but found at least two devices, mps:0 and cpu!`
+**Solution**:
+*   Replaced the `is_cuda` conditional block with `self.device = x.device` — a single line that handles CUDA, MPS, and CPU uniformly.
+*   Fixed `self.end_frames = torch.as_tensor(xlens).to(self.device) - 1` (two occurrences) so the index tensor is created on the correct device.
+
+---
+
 ## 5. Conclusion
 The project now successfully runs a complete end-to-end pipeline on macOS (Apple Silicon). It leverages the power of local LLMs for text correction and state-of-the-art generative models for video synthesis, all within a unified Python environment.

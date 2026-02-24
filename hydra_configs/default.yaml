@@ -8,7 +8,7 @@ hydra:
   output_subdir: null  
   run:  
     dir: .
-config_filename: null
+config_filename: configs/LRS3_V_WER19.1.ini
 data_dir: null
 data_filename: null
 data_ext: ".mp4"

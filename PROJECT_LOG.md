@@ -52,3 +52,40 @@
 - **Codebase**: Vendored the `float_module` into the main repository for better version control and stability.
 
 All future edits and improvements will be documented in this log.
+
+## February 24, 2026
+
+### Context
+Project was transferred from a local disk to an external SSD. Several environment and configuration issues surfaced as a result of the move.
+
+### Bug Fixes
+
+#### Fix 1: `config_filename` was `null` in Hydra config
+- **File**: `hydra_configs/default.yaml`
+- **Issue**: `config_filename` was set to `null`, causing `cfg.config_filename` to be `None` at runtime, which triggered a `TypeError` in `os.path.isfile(None)`.
+- **Fix**: Set `config_filename: configs/LRS3_V_WER19.1.ini` as the default.
+
+#### Fix 2: Missing VSR model weights
+- **Issue**: `benchmarks/LRS3/models/LRS3_V_WER19.1/model.pth` and `benchmarks/LRS3/language_models/lm_en_subword/model.pth` were not present on the new disk.
+- **Fix**: Downloaded both files from HuggingFace (`Amanvir/LRS3_V_WER19.1` and `Amanvir/lm_en_subword`) using `setup.sh` wget commands.
+
+#### Fix 3: `ibug` face detection packages not installed
+- **Issue**: `ibug-face-detection` and `ibug-face-alignment` were not present in the Python environment after the disk transfer. These packages are not on PyPI.
+- **Fix**: Cloned both repos from GitHub (`hhj1897/face_detection`, `hhj1897/face_alignment`) and installed with `pip install -e .`. The `ibug/LFS` budget was exceeded for `Resnet50_Final.pth`; the file was downloaded separately and placed at `/tmp/face_detection/ibug/face_detection/retina_face/weights/Resnet50_Final.pth`.
+
+#### Fix 4: RetinaFace detector hardcoded to `cuda:0`
+- **File**: `pipelines/pipeline.py`, line 58
+- **Issue**: `LandmarksDetector(device="cuda:0")` was hardcoded, ignoring the device selected at startup.
+- **Fix**: Changed to `LandmarksDetector(device=str(device))` to pass through the actual runtime device.
+
+#### Fix 5: MPS not included in device selection
+- **File**: `main.py`
+- **Issue**: Device selection only checked for CUDA or fell back to CPU, skipping MPS entirely.
+- **Fix**: Added `elif torch.backends.mps.is_available(): device = torch.device("mps")` between the CUDA and CPU branches.
+
+#### Fix 6: CTC prefix scorer hardcoded CUDA device detection
+- **File**: `espnet/nets/ctc_prefix_score.py`
+- **Issue**: `self.device` was determined by `x.is_cuda`, which returns `False` for MPS tensors, causing `self.device = cpu` while input tensors were on `mps`. This produced a `RuntimeError: Expected all tensors to be on the same device` during beam search.
+- **Fix**:
+  - Replaced the `is_cuda` guard with `self.device = x.device` (handles CUDA, MPS, and CPU uniformly).
+  - Changed both `torch.as_tensor(xlens) - 1` occurrences to `torch.as_tensor(xlens).to(self.device) - 1` so `end_frames` lands on the correct device.

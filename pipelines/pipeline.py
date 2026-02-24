@@ -55,7 +55,7 @@ class InferencePipeline(torch.nn.Module):
                 self.landmarks_detector = LandmarksDetector()
             if detector == "retinaface":
                 from pipelines.detectors.retinaface.detector import LandmarksDetector
-                self.landmarks_detector = LandmarksDetector(device="cuda:0")
+                self.landmarks_detector = LandmarksDetector(device=str(device))
         else:
             self.landmarks_detector = None
 
